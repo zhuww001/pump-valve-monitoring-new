@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑设备 - {{ device.name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .form-control:disabled {
+            background-color: #e9ecef;
+            cursor: not-allowed;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            font-size: 16px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .alert {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>编辑设备</h1>
+        
+        <div id="message-container"></div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3>设备信息</h3>
+            </div>
+            <div class="card-body">
+                <form id="edit-form">
+                    <div class="form-group">
+                        <label class="form-label">设备ID</label>
+                        <input type="text" class="form-control" id="device-id" value="{{ device.id }}" disabled>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">设备名称</label>
+                        <input type="text" class="form-control" id="device-name" value="{{ device.name }}" disabled>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">位置</label>
+                        <input type="text" class="form-control" id="device-location" value="{{ device.location }}" disabled>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">负责人 *</label>
+                        <input type="text" class="form-control" id="device-manager" value="{{ device.manager }}" placeholder="请输入负责人姓名" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">联系方式 *</label>
+                        <input type="text" class="form-control" id="device-contact" value="{{ device.contact }}" placeholder="请输入手机号码" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-success">保存修改</button>
+                        <a href="/" class="btn btn-warning">返回设备列表</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const deviceId = '{{ device_id }}';
+        
+        document.getElementById('edit-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const manager = document.getElementById('device-manager').value.trim();
+            const contact = document.getElementById('device-contact').value.trim();
+            
+            if (!manager) {
+                showMessage('请输入负责人姓名', 'danger');
+                return;
+            }
+            
+            if (!contact) {
+                showMessage('请输入联系方式', 'danger');
+                return;
+            }
+            
+            const phoneRegex = /^1[3-9]\d{9}$/;
+            if (!phoneRegex.test(contact)) {
+                showMessage('请输入正确的手机号码格式', 'danger');
+                return;
+            }
+            
+            fetch('/api/update-device', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    device_id: deviceId,
+                    manager: manager,
+                    contact: contact
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('设备信息保存成功！', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1500);
+                    } else {
+                        showMessage('保存失败：' + data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    showMessage('保存失败：' + error.message, 'danger');
+                });
+        });
+        
+        function showMessage(message, type) {
+            const container = document.getElementById('message-container');
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+            container.innerHTML = `
+                <div class="alert ${alertClass}">
+                    ${message}
+                </div>
+            `;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

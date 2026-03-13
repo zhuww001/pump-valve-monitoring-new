@@ -1,0 +1,21 @@
+# 忽略虚拟环境目录
+.venv/
+
+# 忽略数据文件
+data/
+
+# 忽略日志文件
+logs/
+
+# 忽略编译后的文件
+__pycache__/
+*.pyc
+
+# 忽略 IDE 相关文件
+.vscode/
+.idea/
+
+# 忽略其他临时文件
+*.tmp
+*.temp
+*.swp

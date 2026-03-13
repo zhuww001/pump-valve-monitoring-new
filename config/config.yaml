@@ -1,0 +1,90 @@
+alert:
+  levels:
+  - description: 一般预警
+    name: general
+  - description: 紧急预警
+    name: urgent
+  output:
+    console: true
+    csv: true
+    log: true
+    sms: true
+  sms:
+    aliyun:
+      access_key_id: your_access_key_id
+      access_key_secret: your_access_key_secret
+      sign_name: 你的签名
+      template_code: SMS_123456789
+    provider: simulation
+    recipients:
+    - '13800138000'
+    - '13900139000'
+    simulation:
+      delay: 1
+      enabled: true
+    template: 【泵阀管道预警】{alert_level}：{message}，时间：{timestamp}
+    twilio:
+      account_sid: your_account_sid
+      auth_token: your_auth_token
+      from_number: '+1234567890'
+anomaly_detection:
+  consecutive_triggers: 2
+  flow_threshold: 5
+  model:
+    path: models/lstm_model.h5
+    type: lstm
+  pressure_threshold: 5
+data_collection:
+  api:
+    max_retries: 3
+    mock_api_url: http://localhost:8001/api/pump-data
+    real_api_url: ''
+    timeout: 3
+  collection_interval: 10
+data_preprocessing:
+  baseline_window: 1
+  missing_value_strategy: interpolate
+  outlier_threshold: 3
+devices:
+- contact: '13800138000'
+  id: device_1
+  initial_baseline:
+    flow: 12.5
+    pressure: 0.8
+  location: A车间
+  manager: 李经理
+  mock_api_url: http://localhost:8001/api/pump-data?device_id=device_1
+  name: 一号泵阀
+- contact: '13900139009'
+  id: device_2
+  initial_baseline:
+    flow: 13.0
+    pressure: 0.75
+  location: B车间
+  manager: 赵经理
+  mock_api_url: http://localhost:8001/api/pump-data?device_id=device_2
+  name: 二号泵阀
+- contact: '13800138003'
+  id: device_3
+  initial_baseline:
+    flow: 12.0
+    pressure: 0.85
+  location: C车间
+  manager: 王经理
+  mock_api_url: http://localhost:8001/api/pump-data?device_id=device_3
+  name: 三号泵阀
+simulator:
+  blockage_conditions:
+    flow_decrease: 1.0
+    pressure_increase: 0.05
+    start_time: '10:05:00'
+  mode: normal
+  normal_conditions:
+    flow_base: 12.5
+    flow_variation: 0.3
+    pressure_base: 0.8
+    pressure_variation: 0.02
+storage:
+  alert_log_path: logs/alert_log.csv
+  raw_data_path: data/raw_data.csv
+  system_log_path: logs/system.log

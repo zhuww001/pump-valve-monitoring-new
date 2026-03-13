@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>泵阀管道堵塞预警系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .col-md-6 {
+            flex: 0 0 48%;
+            margin: 0 1%;
+        }
+        .col-md-12 {
+            flex: 0 0 98%;
+            margin: 0 1%;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .alert {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>泵阀管道堵塞预警系统</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>设备选择</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="device-select">选择设备:</label>
+                            <select id="device-select" class="form-control" style="width: 300px; display: inline-block; margin-right: 10px;">
+                                {% for device in devices %}
+                                    <option value="{{ device.id }}">{{ device.name }} ({{ device.location }})</option>
+                                {% endfor %}
+                            </select>
+                            <button id="switch-device" class="btn btn-success">切换设备</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>实时数据</h3>
+                    </div>
+                    <div class="card-body">
+                        <table>
+                            <tbody id="data-table">
+                                <tr>
+                                    <td>压力</td>
+                                    <td id="pressure">-</td>
+                                </tr>
+                                <tr>
+                                    <td>流量</td>
+                                    <td id="flow">-</td>
+                                </tr>
+                                <tr>
+                                    <td>阀门开度</td>
+                                    <td id="valve_open">-</td>
+                                </tr>
+                                <tr>
+                                    <td>温度</td>
+                                    <td id="temperature">-</td>
+                                </tr>
+                                <tr>
+                                    <td>时间戳</td>
+                                    <td id="timestamp">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3>系统状态</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <button id="start-blockage" class="btn btn-danger">开始堵塞模拟</button>
+                            <button id="stop-blockage" class="btn btn-success">停止堵塞模拟</button>
+                        </div>
+                        <div id="system-status">
+                            <p>系统运行中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>预警信息</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="alert-info">
+                            <p>暂无预警信息</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3>数据趋势</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="pressure-chart"></canvas>
+                        </div>
+                        <div class="chart-container mt-4">
+                            <canvas id="flow-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 当前选中的设备ID
+        let currentDeviceId = document.getElementById('device-select').value;
+        
+        // 简单的图表绘制函数
+        function drawChart(canvasId, labels, data, title, color) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (data.length === 0) return;
+            
+            // 计算尺寸
+            const padding = 40;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 2;
+            
+            // 计算数据范围
+            const minValue = Math.min(...data);
+            const maxValue = Math.max(...data);
+            const valueRange = maxValue - minValue || 1;
+            
+            // 绘制标题
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(title, canvas.width / 2, padding / 2);
+            
+            // 绘制坐标轴
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+            
+            // 绘制数据点和连线
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            
+            for (let i = 0; i < data.length; i++) {
+                const x = padding + (i / (data.length - 1)) * chartWidth;
+                const y = canvas.height - padding - ((data[i] - minValue) / valueRange) * chartHeight;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+            
+            // 绘制数据点
+            for (let i = 0; i < data.length; i++) {
+                const x = padding + (i / (data.length - 1)) * chartWidth;
+                const y = canvas.height - padding - ((data[i] - minValue) / valueRange) * chartHeight;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+        }
+        
+        // 更新图表数据
+        function updateCharts() {
+            fetch(`/api/history?device_id=${currentDeviceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新压力图表
+                    drawChart('pressure-chart', data.timestamps, data.pressure, '压力变化趋势 (MPa)', '#ff6384');
+                    
+                    // 更新流量图表
+                    drawChart('flow-chart', data.timestamps, data.flow, '流量变化趋势 (m³/h)', '#36a2eb');
+                });
+        }
+        
+        // 定期获取数据
+        setInterval(() => {
+            fetch(`/api/data?device_id=${currentDeviceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新实时数据
+                    if (data.latest_data) {
+                        document.getElementById('pressure').textContent = data.latest_data.pressure || '-';
+                        document.getElementById('flow').textContent = data.latest_data.flow || '-';
+                        document.getElementById('valve_open').textContent = data.latest_data.valve_open || '-';
+                        document.getElementById('temperature').textContent = data.latest_data.temperature || '-';
+                        document.getElementById('timestamp').textContent = data.latest_data.timestamp || '-';
+                    }
+                    
+                    // 更新预警信息
+                    if (data.latest_alert) {
+                        document.getElementById('alert-info').innerHTML = `
+                            <div class="alert alert-danger">
+                                <h4>${data.latest_alert.alert_level}</h4>
+                                <p>${data.latest_alert.message}</p>
+                                <p>时间: ${data.latest_alert.timestamp}</p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('alert-info').innerHTML = '<p>暂无预警信息</p>';
+                    }
+                });
+            
+            // 更新图表
+            updateCharts();
+        }, 2000);
+        
+        // 控制模拟API
+        document.getElementById('start-blockage').addEventListener('click', () => {
+            fetch(`/api/set-mode`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: 'blockage', device_id: currentDeviceId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.msg);
+                });
+        });
+        
+        document.getElementById('stop-blockage').addEventListener('click', () => {
+            fetch(`/api/set-mode`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: 'normal', device_id: currentDeviceId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.msg);
+                });
+        });
+        
+        // 设备切换
+        document.getElementById('switch-device').addEventListener('click', () => {
+            currentDeviceId = document.getElementById('device-select').value;
+            // 立即更新数据
+            fetch(`/api/data?device_id=${currentDeviceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新实时数据
+                    if (data.latest_data) {
+                        document.getElementById('pressure').textContent = data.latest_data.pressure || '-';
+                        document.getElementById('flow').textContent = data.latest_data.flow || '-';
+                        document.getElementById('valve_open').textContent = data.latest_data.valve_open || '-';
+                        document.getElementById('temperature').textContent = data.latest_data.temperature || '-';
+                        document.getElementById('timestamp').textContent = data.latest_data.timestamp || '-';
+                    }
+                    
+                    // 更新预警信息
+                    if (data.latest_alert) {
+                        document.getElementById('alert-info').innerHTML = `
+                            <div class="alert alert-danger">
+                                <h4>${data.latest_alert.alert_level}</h4>
+                                <p>${data.latest_alert.message}</p>
+                                <p>时间: ${data.latest_alert.timestamp}</p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('alert-info').innerHTML = '<p>暂无预警信息</p>';
+                    }
+                });
+            
+            // 更新图表
+            updateCharts();
+        });
+        
+        // 页面加载完成后初始化图表
+        window.onload = function() {
+            // 设置画布尺寸
+            const pressureCanvas = document.getElementById('pressure-chart');
+            const flowCanvas = document.getElementById('flow-chart');
+            
+            pressureCanvas.width = pressureCanvas.parentElement.clientWidth;
+            pressureCanvas.height = 300;
+            flowCanvas.width = flowCanvas.parentElement.clientWidth;
+            flowCanvas.height = 300;
+            
+            // 初始加载数据
+            updateCharts();
+        };
+    </script>
+</body>
+</html>

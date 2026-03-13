@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ device.name }} - 预警记录</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 8px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .alert {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .filter-container {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .form-control {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+            min-width: 150px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ device.name }} - 预警记录</h1>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3>预警筛选</h3>
+            </div>
+            <div class="card-body">
+                <div class="filter-container">
+                    <select class="form-control" id="alert-level">
+                        <option value="all">所有级别</option>
+                        <option value="general">一般预警</option>
+                        <option value="urgent">紧急预警</option>
+                    </select>
+                    <input type="datetime-local" class="form-control" id="start-time">
+                    <input type="datetime-local" class="form-control" id="end-time">
+                    <button class="btn btn-success" onclick="filterAlerts()">筛选</button>
+                    <button class="btn btn-warning" onclick="refreshAlerts()">刷新数据</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3>预警记录</h3>
+            </div>
+            <div class="card-body">
+                <div id="alerts-container">
+                    <!-- 预警记录将通过JavaScript动态加载 -->
+                </div>
+                <table id="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>时间戳</th>
+                            <th>预警级别</th>
+                            <th>预警信息</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 数据将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <a href="/" class="btn btn-primary">返回设备列表</a>
+            <a href="/device/{{ device_id }}" class="btn btn-success">查看实时数据</a>
+            <a href="/device/{{ device_id }}/history" class="btn btn-warning">查看历史数据</a>
+        </div>
+    </div>
+    
+    <script>
+        // 设备ID
+        const deviceId = '{{ device_id }}';
+        
+        // 初始化时间范围
+        function initTimeRange() {
+            const now = new Date();
+            const endTime = now.toISOString().slice(0, 16);
+            const startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+            
+            document.getElementById('start-time').value = startTime;
+            document.getElementById('end-time').value = endTime;
+        }
+        
+        // 刷新预警数据
+        function refreshAlerts() {
+            // 加载预警数据
+            fetch(`/api/alerts?device_id=${deviceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateAlerts(data);
+                });
+        }
+        
+        // 筛选预警数据
+        function filterAlerts() {
+            const alertLevel = document.getElementById('alert-level').value;
+            const startTime = document.getElementById('start-time').value;
+            const endTime = document.getElementById('end-time').value;
+            
+            // 加载预警数据
+            fetch(`/api/alerts?device_id=${deviceId}&level=${alertLevel}&start=${startTime}&end=${endTime}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateAlerts(data);
+                });
+        }
+        
+        // 更新预警数据
+        function updateAlerts(data) {
+            const container = document.getElementById('alerts-container');
+            const tbody = document.getElementById('alerts-table').querySelector('tbody');
+            
+            // 清空容器
+            container.innerHTML = '';
+            tbody.innerHTML = '';
+            
+            if (data && data.length > 0) {
+                // 显示预警卡片
+                data.forEach(alert => {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = `alert ${alert.alert_level === '紧急预警' ? 'alert-danger' : 'alert-warning'}`;
+                    alertDiv.innerHTML = `
+                        <h4>${alert.alert_level}</h4>
+                        <p>${alert.message}</p>
+                        <p>时间: ${alert.timestamp}</p>
+                    `;
+                    container.appendChild(alertDiv);
+                    
+                    // 添加到表格
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${alert.timestamp}</td>
+                        <td>${alert.alert_level}</td>
+                        <td>${alert.message}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                container.innerHTML = '<p>暂无预警记录</p>';
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="3" style="text-align: center;">暂无预警记录</td>';
+                tbody.appendChild(row);
+            }
+        }
+        
+        // 页面加载完成后初始化
+        window.onload = function() {
+            initTimeRange();
+            refreshAlerts();
+        };
+    </script>
+</body>
+</html>

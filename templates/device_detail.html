@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ device.name }} - 实时数据</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 240px;
+            background-color: #1a237e;
+            color: white;
+            padding: 20px 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: left;
+        }
+        
+        .sidebar-menu {
+            list-style: none;
+        }
+        
+        .sidebar-menu li {
+            margin: 0;
+        }
+        
+        .sidebar-menu a {
+            display: block;
+            padding: 12px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-menu a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .sidebar-menu a.active {
+            background-color: #2196f3;
+            color: white;
+        }
+        
+        /* 主内容区域 */
+        .main-content {
+            flex: 1;
+            margin-left: 240px;
+            padding: 20px;
+        }
+        
+        /* 顶部导航栏 */
+        .top-nav {
+            background-color: white;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .top-nav h2 {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a237e;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background-color: #f5f7fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-header h3 {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a237e;
+            margin: 0;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        /* 表格样式 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th {
+            background-color: #f5f7fa;
+            font-weight: bold;
+            color: #1a237e;
+        }
+        
+        tr:hover {
+            background-color: #f5f7fa;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 8px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background-color: #2196f3;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #1976d2;
+        }
+        
+        .btn-success {
+            background-color: #4caf50;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #388e3c;
+        }
+        
+        .btn-warning {
+            background-color: #ff9800;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background-color: #f57c00;
+        }
+        
+        .btn-danger {
+            background-color: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #d32f2f;
+        }
+        
+        /* 预警样式 */
+        .alert {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* 图表容器 */
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            margin: 10px 0;
+        }
+        
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>泵阀管道堵塞预警系统</h1>
+            </div>
+            <ul class="sidebar-menu">
+                <li><a href="/">设备管理</a></li>
+                <li><a href="/device/{{ device_id }}" class="active">实时数据</a></li>
+                <li><a href="/device/{{ device_id }}/history">历史数据</a></li>
+                <li><a href="/device/{{ device_id }}/alerts">预警记录</a></li>
+                <li><a href="#">系统设置</a></li>
+            </ul>
+        </div>
+        
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 顶部导航栏 -->
+            <div class="top-nav">
+                <h2>{{ device.name }} - 实时数据</h2>
+                <div class="user-info">
+                    <span>管理员</span>
+                </div>
+            </div>
+            
+            <!-- 设备信息卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>设备信息</h3>
+                </div>
+                <div class="card-body">
+                    <table>
+                        <tr>
+                            <td>设备ID</td>
+                            <td>{{ device.id }}</td>
+                        </tr>
+                        <tr>
+                            <td>设备名称</td>
+                            <td>{{ device.name }}</td>
+                        </tr>
+                        <tr>
+                            <td>位置</td>
+                            <td>{{ device.location }}</td>
+                        </tr>
+                        <tr>
+                            <td>负责人</td>
+                            <td>{{ device.manager }}</td>
+                        </tr>
+                        <tr>
+                            <td>联系方式</td>
+                            <td>{{ device.contact }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 实时数据卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>实时数据</h3>
+                </div>
+                <div class="card-body">
+                    <table id="data-table">
+                        <tr>
+                            <td>压力</td>
+                            <td id="pressure">-</td>
+                            <td>MPa</td>
+                        </tr>
+                        <tr>
+                            <td>流量</td>
+                            <td id="flow">-</td>
+                            <td>m³/h</td>
+                        </tr>
+                        <tr>
+                            <td>阀门开度</td>
+                            <td id="valve_open">-</td>
+                            <td>%</td>
+                        </tr>
+                        <tr>
+                            <td>温度</td>
+                            <td id="temperature">-</td>
+                            <td>℃</td>
+                        </tr>
+                        <tr>
+                            <td>时间戳</td>
+                            <td id="timestamp">-</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 系统状态卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>系统状态</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <button id="start-blockage" class="btn btn-warning">开始堵塞模拟</button>
+                        <button id="stop-blockage" class="btn btn-success">停止堵塞模拟</button>
+                    </div>
+                    <div id="system-status">
+                        <p>系统运行中...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 预警信息卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>预警信息</h3>
+                </div>
+                <div class="card-body">
+                    <div id="alert-info">
+                        <p>暂无预警信息</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 数据趋势卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>数据趋势</h3>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="pressure-chart"></canvas>
+                    </div>
+                    <div class="chart-container mt-4">
+                        <canvas id="flow-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="mt-4">
+                <a href="/" class="btn btn-primary">返回设备列表</a>
+                <a href="/device/{{ device_id }}/edit" class="btn btn-warning">编辑设备信息</a>
+                <a href="/device/{{ device_id }}/history" class="btn btn-success">查看历史数据</a>
+                <a href="/device/{{ device_id }}/alerts" class="btn btn-danger">查看预警记录</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 设备ID
+        const deviceId = '{{ device_id }}';
+        
+        // 简单的图表绘制函数
+        function drawChart(canvasId, labels, data, title, color) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (!data || data.length === 0) {
+                // 显示无数据提示
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#999';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无数据', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            // 计算尺寸
+            const padding = 60;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 2;
+            
+            // 计算数据范围
+            const validData = data.filter(val => val !== null && val !== undefined);
+            if (validData.length === 0) {
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#999';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无数据', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            const minValue = Math.min(...validData);
+            const maxValue = Math.max(...validData);
+            const valueRange = maxValue - minValue || 1;
+            
+            // 绘制标题
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(title, canvas.width / 2, padding / 2);
+            
+            // 绘制坐标轴
+            ctx.beginPath();
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+            
+            // 绘制Y轴刻度
+            const yStep = chartHeight / 5;
+            for (let i = 0; i <= 5; i++) {
+                const y = canvas.height - padding - i * yStep;
+                const value = minValue + (i / 5) * valueRange;
+                
+                ctx.beginPath();
+                ctx.moveTo(padding - 5, y);
+                ctx.lineTo(padding, y);
+                ctx.stroke();
+                
+                ctx.font = '11px Arial';
+                ctx.fillStyle = '#666';
+                ctx.textAlign = 'right';
+                ctx.fillText(value.toFixed(2), padding - 10, y + 4);
+            }
+            
+            // 绘制X轴刻度（时间）
+            const xStep = chartWidth / Math.min(5, data.length - 1);
+            for (let i = 0; i < data.length; i += Math.ceil(data.length / 6)) {
+                const x = padding + (i / (data.length - 1)) * chartWidth;
+                
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height - padding);
+                ctx.lineTo(x, canvas.height - padding + 5);
+                ctx.stroke();
+                
+                ctx.font = '10px Arial';
+                ctx.fillStyle = '#666';
+                ctx.textAlign = 'center';
+                
+                // 提取时间部分（只显示时分）
+                const timeStr = labels[i] ? labels[i].substring(11, 16) : '';
+                ctx.fillText(timeStr, x, canvas.height - padding + 18);
+            }
+            
+            // 绘制数据点和连线
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            
+            let firstPoint = true;
+            for (let i = 0; i < data.length; i++) {
+                if (data[i] !== null && data[i] !== undefined) {
+                    const x = padding + (i / (data.length - 1)) * chartWidth;
+                    const y = canvas.height - padding - ((data[i] - minValue) / valueRange) * chartHeight;
+                    
+                    if (firstPoint) {
+                        ctx.moveTo(x, y);
+                        firstPoint = false;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            }
+            ctx.stroke();
+            
+            // 绘制数据点
+            for (let i = 0; i < data.length; i++) {
+                if (data[i] !== null && data[i] !== undefined) {
+                    const x = padding + (i / (data.length - 1)) * chartWidth;
+                    const y = canvas.height - padding - ((data[i] - minValue) / valueRange) * chartHeight;
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+            
+            // 添加鼠标悬停事件
+            canvas.onmousemove = function(e) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // 查找最近的数据点
+                let minDist = Infinity;
+                let closestIndex = -1;
+                
+                for (let i = 0; i < data.length; i++) {
+                    if (data[i] !== null && data[i] !== undefined) {
+                        const x = padding + (i / (data.length - 1)) * chartWidth;
+                        const y = canvas.height - padding - ((data[i] - minValue) / valueRange) * chartHeight;
+                        
+                        const dist = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+                        if (dist < minDist && dist < 20) {
+                            minDist = dist;
+                            closestIndex = i;
+                        }
+                    }
+                }
+                
+                // 重新绘制图表
+                drawChart(canvasId, labels, data, title, color);
+                
+                // 如果找到最近的数据点，显示提示框
+                if (closestIndex >= 0) {
+                    const x = padding + (closestIndex / (data.length - 1)) * chartWidth;
+                    const y = canvas.height - padding - ((data[closestIndex] - minValue) / valueRange) * chartHeight;
+                    
+                    // 绘制提示框
+                    const tooltipText = `时间: ${labels[closestIndex]}\n数值: ${data[closestIndex].toFixed(2)}`;
+                    const lines = tooltipText.split('\n');
+                    const lineHeight = 16;
+                    const tooltipWidth = Math.max(...lines.map(line => ctx.measureText(line).width)) + 20;
+                    const tooltipHeight = lines.length * lineHeight + 10;
+                    
+                    let tooltipX = x + 10;
+                    let tooltipY = y - tooltipHeight / 2;
+                    
+                    // 确保提示框在画布内
+                    if (tooltipX + tooltipWidth > canvas.width) {
+                        tooltipX = x - tooltipWidth - 10;
+                    }
+                    if (tooltipY < 0) {
+                        tooltipY = 10;
+                    }
+                    if (tooltipY + tooltipHeight > canvas.height) {
+                        tooltipY = canvas.height - tooltipHeight - 10;
+                    }
+                    
+                    // 绘制提示框背景
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+                    
+                    // 绘制提示框文字
+                    ctx.font = '12px Arial';
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'left';
+                    for (let i = 0; i < lines.length; i++) {
+                        ctx.fillText(lines[i], tooltipX + 10, tooltipY + 15 + i * lineHeight);
+                    }
+                    
+                    // 高亮数据点
+                    ctx.beginPath();
+                    ctx.arc(x, y, 6, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            };
+            
+            // 鼠标离开时清除提示框
+            canvas.onmouseleave = function() {
+                drawChart(canvasId, labels, data, title, color);
+            };
+        }
+        
+        // 更新图表数据
+        function updateCharts() {
+            fetch(`/api/history?device_id=${deviceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新压力图表
+                    drawChart('pressure-chart', data.timestamps, data.pressure, '压力变化趋势 (MPa)', '#ff6384');
+                    
+                    // 更新流量图表
+                    drawChart('flow-chart', data.timestamps, data.flow, '流量变化趋势 (m³/h)', '#36a2eb');
+                })
+                .catch(error => {
+                    console.error('获取图表数据失败:', error);
+                });
+        }
+        
+        // 定期获取数据
+        setInterval(() => {
+            fetch(`/api/data?device_id=${deviceId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 更新实时数据
+                    if (data.latest_data) {
+                        document.getElementById('pressure').textContent = data.latest_data.pressure || '-';
+                        document.getElementById('flow').textContent = data.latest_data.flow || '-';
+                        document.getElementById('valve_open').textContent = data.latest_data.valve_open || '-';
+                        document.getElementById('temperature').textContent = data.latest_data.temperature || '-';
+                        document.getElementById('timestamp').textContent = data.latest_data.timestamp || '-';
+                    }
+                    
+                    // 更新预警信息
+                    if (data.latest_alert && data.latest_alert.alert_level) {
+                        document.getElementById('alert-info').innerHTML = `
+                            <div class="alert alert-danger">
+                                <h4>${data.latest_alert.alert_level}</h4>
+                                <p>${data.latest_alert.message}</p>
+                                <p>时间: ${data.latest_alert.timestamp}</p>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('alert-info').innerHTML = '<p>暂无预警信息</p>';
+                    }
+                });
+            
+            // 更新图表
+            updateCharts();
+        }, 2000);
+        
+        // 控制模拟API
+        document.getElementById('start-blockage').addEventListener('click', () => {
+            fetch(`/api/set-mode`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: 'blockage', device_id: deviceId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert('堵塞模拟已开始，请密切关注压力和流量变化，系统将在检测到异常时生成预警。');
+                });
+        });
+        
+        document.getElementById('stop-blockage').addEventListener('click', () => {
+            fetch(`/api/set-mode`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: 'normal', device_id: deviceId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert('堵塞模拟已停止，系统恢复正常运行状态。');
+                });
+        });
+        
+        // 页面加载完成后初始化图表
+        window.onload = function() {
+            // 设置画布尺寸
+            const pressureCanvas = document.getElementById('pressure-chart');
+            const flowCanvas = document.getElementById('flow-chart');
+            
+            pressureCanvas.width = pressureCanvas.parentElement.clientWidth;
+            pressureCanvas.height = 300;
+            flowCanvas.width = flowCanvas.parentElement.clientWidth;
+            flowCanvas.height = 300;
+            
+            // 初始加载数据
+            updateCharts();
+        };
+    </script>
+</body>
+</html>
