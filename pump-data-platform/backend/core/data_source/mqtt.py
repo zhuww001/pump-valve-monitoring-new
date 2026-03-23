@@ -1,12 +1,24 @@
 from .base import BaseDataSource
 from typing import List, Dict, Optional
 from datetime import datetime
-import paho.mqtt.client as mqtt
 import json
 import threading
 import time
 from collections import defaultdict
 from ..config import settings
+
+# 尝试导入 paho-mqtt，如果失败则使用占位类
+try:
+    import paho.mqtt.client as mqtt
+    PAHO_MQTT_AVAILABLE = True
+except ImportError:
+    PAHO_MQTT_AVAILABLE = False
+    print("警告：paho-mqtt 未安装，MQTT 功能将不可用")
+    # 创建占位类以避免导入错误
+    class mqtt:
+        Client = None
+        def __init__(self):
+            pass
 
 
 class MqttDataSource(BaseDataSource):
@@ -34,23 +46,31 @@ class MqttDataSource(BaseDataSource):
         self.history_data = MqttDataSource._global_history_data
         # 设备列表，使用全局设备列表
         self.devices = MqttDataSource._global_devices
-        
-        # 初始化MQTT客户端
-        self.client = mqtt.Client(client_id=self.client_id)
-        self.client.on_connect = self._on_connect
-        self.client.on_message = self._on_message
-        
-        # 连接到MQTT broker
-        self._connect()
-        
-        # 启动MQTT客户端线程
-        self.thread = threading.Thread(target=self._run_client)
-        self.thread.daemon = True
-        self.thread.start()
-        
-        # 初始化设备列表（如果全局设备列表为空）
-        if not self.devices:
-            self._initialize_devices()
+                
+        # 检查 paho-mqtt 是否可用
+        if not PAHO_MQTT_AVAILABLE:
+            print("MQTT 功能不可用，将使用模拟数据源")
+            return
+                
+        # 初始化 MQTT 客户端
+        try:
+            self.client = mqtt.Client(client_id=self.client_id)
+            self.client.on_connect = self._on_connect
+            self.client.on_message = self._on_message
+                    
+            # 连接到 MQTT broker
+            self._connect()
+                    
+            # 启动 MQTT 客户端线程
+            self.thread = threading.Thread(target=self._run_client)
+            self.thread.daemon = True
+            self.thread.start()
+                    
+            # 初始化设备列表（如果全局设备列表为空）
+            if not self.devices:
+                self._initialize_devices()
+        except Exception as e:
+            print(f"MQTT 初始化失败：{e}，将使用模拟数据源")
     
     def _connect(self):
         """连接到MQTT broker"""

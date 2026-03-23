@@ -19,12 +19,25 @@ class DataSourceManager:
     
     def _init(self):
         """初始化数据源"""
+        # 尝试初始化 MQTT 数据源，如果失败则降级到模拟数据源
+        mqtt_available = True
+        try:
+            mqtt_source = MqttDataSource()
+        except Exception as e:
+            print(f"MQTT 数据源初始化失败：{e}，将使用模拟数据源替代")
+            mqtt_available = False
+            mqtt_source = None
+        
         self.data_sources = {
             "simulate": SimulateDataSource(),
             "api": ApiDataSource(),
             "report": ReportDataSource(),
-            "mqtt": MqttDataSource()
         }
+        
+        # 只有 MQTT 可用时才添加
+        if mqtt_available and mqtt_source:
+            self.data_sources["mqtt"] = mqtt_source
+        
         self.current_data_source = None
         self.update_data_source()
     
