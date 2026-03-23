@@ -10,6 +10,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from api import api_router
 from core.config import settings
 from core.data_process import DataCollector
+from core.db.postgres import init_postgres_pool
+from core.db.influxdb import init_influxdb_client
+from core.db.redis import init_redis_client
 import asyncio
 
 # 创建FastAPI应用
@@ -43,6 +46,14 @@ async def start_data_collection():
 @app.on_event("startup")
 async def startup_event():
     """应用启动事件"""
+    # 初始化数据库连接
+    if not settings.LOCAL_MODE:
+        print("初始化数据库连接...")
+        init_postgres_pool()
+        init_influxdb_client()
+        init_redis_client()
+        print("数据库连接初始化完成")
+    
     # 启动数据采集任务
     asyncio.create_task(start_data_collection())
 
@@ -61,6 +72,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,
         reload=settings.DEBUG
     )

@@ -1,12 +1,18 @@
 <template>
   <div class="history">
-    <h2>历史数据</h2>
+    <h2 class="page-title">
+      历史数据
+      <span v-if="routeDeviceId" class="device-filter-tag">
+        (设备: {{ routeDeviceId }})
+        <el-button type="text" size="small" @click="clearDeviceFilter">清除筛选</el-button>
+      </span>
+    </h2>
     
     <!-- 筛选条件 -->
     <el-card class="filter-card">
       <el-form :inline="true" :model="filterForm" class="filter-form">
         <el-form-item label="设备">
-          <el-select v-model="filterForm.device_id" placeholder="请选择设备" style="width:160px" @change="loadHistoryData">
+          <el-select v-model="filterForm.device_id" placeholder="请选择设备" style="width:160px" @change="handleDeviceChange">
             <el-option
               v-for="d in devices"
               :key="d.device_id"
@@ -29,6 +35,7 @@
             type="datetime"
             placeholder="选择开始时间"
             style="width: 200px"
+            @change="loadHistoryData"
           />
         </el-form-item>
         <el-form-item label="结束时间" v-if="timeRange === 'custom'">
@@ -37,6 +44,7 @@
             type="datetime"
             placeholder="选择结束时间"
             style="width: 200px"
+            @change="loadHistoryData"
           />
         </el-form-item>
         <el-form-item>
@@ -51,11 +59,15 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="趋势图" name="chart">
           <!-- 数据趋势图表 -->
-          <div ref="chartRef" class="chart-container"></div>
+          <div class="chart-container">
+            <div ref="pressureChartRef" class="single-chart"></div>
+            <div ref="flowChartRef" class="single-chart"></div>
+            <div ref="temperatureChartRef" class="single-chart"></div>
+          </div>
         </el-tab-pane>
         <el-tab-pane label="数据列表" name="table">
           <!-- 数据表格 -->
-          <el-table :data="historyData" style="width: 100%">
+          <el-table :data="pagedHistoryData" style="width: 100%">
             <el-table-column prop="timestamp" label="时间" width="200">
               <template #default="scope">
                 {{ formatDateTime(scope.row.timestamp) }}
@@ -66,8 +78,8 @@
             <el-table-column prop="temperature" label="温度 (°C)" />
             <el-table-column prop="status" label="状态">
               <template #default="scope">
-                <el-tag :type="scope.row.status === 'normal' ? 'success' : 'warning'">
-                  {{ scope.row.status === 'normal' ? '正常' : '预警' }}
+                <el-tag :type="scope.row.status == 'normal' ? 'success' : 'warning'">
+                  {{ scope.row.status == 'normal' ? '正常' : '预警' }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -91,7 +103,6 @@
 </template>
 
 <script>
-import axios from 'axios'
 import * as echarts from 'echarts'
 
 export default {
@@ -99,11 +110,11 @@ export default {
   data() {
     return {
       devices: [],
-      timeRange: '1h', // 默认1小时
-      activeTab: 'chart', // 默认显示趋势图
+      timeRange: '1h',
+      activeTab: 'chart',
       filterForm: {
         device_id: '',
-        start_time: new Date(Date.now() - 3600000), // 1小时前
+        start_time: new Date(Date.now() - 3600000),
         end_time: new Date()
       },
       historyData: [],
@@ -112,16 +123,19 @@ export default {
         pageSize: 20
       },
       total: 0,
-      chart: null
+      pressureChart: null,
+      flowChart: null,
+      temperatureChart: null
     }
   },
   computed: {
     routeDeviceId() {
       return this.$route.params.device_id
     },
-    currentDeviceName() {
-      const device = this.devices.find(d => d.device_id === this.filterForm.device_id)
-      return device ? device.name : ''
+    pagedHistoryData() {
+      const start = (this.pagination.currentPage - 1) * this.pagination.pageSize
+      const end = start + this.pagination.pageSize
+      return this.historyData.slice(start, end)
     }
   },
   mounted() {
@@ -140,15 +154,23 @@ export default {
     }
   },
   beforeUnmount() {
-    if (this.chart) {
-      this.chart.dispose()
+    if (this.pressureChart) {
+      this.pressureChart.dispose()
+    }
+    if (this.flowChart) {
+      this.flowChart.dispose()
+    }
+    if (this.temperatureChart) {
+      this.temperatureChart.dispose()
     }
   },
   methods: {
     async loadDevices() {
       try {
-        const response = await axios.get('/api/device/list')
-        this.devices = response.data
+        const response = await this.$axios.get('/device/list', {
+          params: { page: 1, page_size: 100 }
+        })
+        this.devices = Array.isArray(response.data.devices) ? response.data.devices : []
         if (this.routeDeviceId) {
           this.filterForm.device_id = this.routeDeviceId
         } else if (!this.filterForm.device_id && this.devices.length > 0) {
@@ -157,31 +179,40 @@ export default {
         this.loadHistoryData()
       } catch (error) {
         console.error('获取设备列表失败:', error)
+        this.devices = []
       }
     },
     async loadHistoryData() {
       if (!this.filterForm.device_id) return
-      
+
+      if (!this.filterForm.start_time) {
+        this.filterForm.start_time = new Date(Date.now() - 3600000)
+      }
+      if (!this.filterForm.end_time) {
+        this.filterForm.end_time = new Date()
+      }
+
       try {
-        const response = await axios.get(`/api/data/history/${this.filterForm.device_id}`, {
+        const response = await this.$axios.get('/data/history/' + this.filterForm.device_id, {
           params: {
-            start_time: this.filterForm.start_time.toISOString(),
-            end_time: this.filterForm.end_time.toISOString()
+            start_time: this.formatLocalISO(this.filterForm.start_time),
+            end_time: this.formatLocalISO(this.filterForm.end_time)
           }
         })
-        
         this.historyData = response.data
         this.total = this.historyData.length
+        this.pagination.currentPage = 1
         this.updateChart()
       } catch (error) {
         console.error('获取历史数据失败:', error)
       }
     },
     initChart() {
-      this.chart = echarts.init(this.$refs.chartRef)
-      this.chart.setOption({
+      // 初始化压力图表
+      this.pressureChart = echarts.init(this.$refs.pressureChartRef)
+      this.pressureChart.setOption({
         title: {
-          text: '历史数据趋势',
+          text: '压力趋势',
           left: 'center',
           top: 4,
           textStyle: { fontSize: 14 }
@@ -189,190 +220,303 @@ export default {
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
-          formatter(params) {
+          formatter: function(params) {
             if (!params.length) return ''
-            const ts = params[0].value[0]
-            const d = new Date(ts)
-            const pad = n => String(n).padStart(2, '0')
-            const time = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-            let html = `<div style="font-weight:bold;margin-bottom:4px">${time}</div>`
-            params.forEach(p => {
-              html += `<div>${p.marker}${p.seriesName}：<b>${p.value[1]}</b></div>`
-            })
-            return html
+            var result = params[0].name + '<br/>'
+            for (var i = 0; i < params.length; i++) {
+              result += params[i].marker + ' ' + params[i].seriesName + ': ' + params[i].value + '<br/>'
+            }
+            return result
           }
         },
-        legend: {
-          data: ['压力 (MPa)', '流量 (m³/h)', '温度 (°C)'],
-          top: 28
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
         },
-        grid: { left: 70, right: 100, top: 72, bottom: 58 },
-        dataZoom: [
-          { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
-          { type: 'slider', xAxisIndex: 0, bottom: 4, height: 22, borderColor: 'transparent' }
-        ],
         xAxis: {
-          type: 'time',
+          type: 'category',
           boundaryGap: false,
-          splitLine: { show: false },
+          data: []
+        },
+        yAxis: {
+          type: 'value',
+          name: '压力 (MPa)',
+          position: 'left',
+          axisLine: {
+            show: true,
+            lineStyle: {
+              color: '#5470c6'
+            }
+          },
           axisLabel: {
-            rotate: 20,
-            fontSize: 11,
-            formatter(value) {
-              const d = new Date(value)
-              const pad = n => String(n).padStart(2, '0')
-              return `${pad(d.getMonth()+1)}-${pad(d.getDate())}\n${pad(d.getHours())}:${pad(d.getMinutes())}`
+            formatter: '{value}'
+          }
+        },
+        series: [
+          {
+            name: '压力',
+            type: 'line',
+            data: [],
+            smooth: true,
+            lineStyle: {
+              color: '#5470c6'
+            },
+            itemStyle: {
+              color: '#5470c6'
             }
           }
+        ]
+      })
+
+      // 初始化流量图表
+      this.flowChart = echarts.init(this.$refs.flowChartRef)
+      this.flowChart.setOption({
+        title: {
+          text: '流量趋势',
+          left: 'center',
+          top: 4,
+          textStyle: { fontSize: 14 }
         },
-        yAxis: [
-          {
-            type: 'value',
-            name: '压力(MPa)',
-            nameTextStyle: { fontSize: 11, color: '#5470c6' },
-            axisLine: { show: true, lineStyle: { color: '#5470c6' } },
-            axisLabel: { color: '#5470c6', fontSize: 11 },
-            splitLine: { lineStyle: { type: 'dashed', color: '#eee' } }
-          },
-          {
-            type: 'value',
-            name: '流量(m³/h)',
-            position: 'right',
-            nameTextStyle: { fontSize: 11, color: '#91cc75' },
-            axisLine: { show: true, lineStyle: { color: '#91cc75' } },
-            axisLabel: { color: '#91cc75', fontSize: 11 },
-            splitLine: { show: false }
-          },
-          {
-            type: 'value',
-            name: '温度(°C)',
-            position: 'right',
-            offset: 68,
-            nameTextStyle: { fontSize: 11, color: '#ee6666' },
-            axisLine: { show: true, lineStyle: { color: '#ee6666' } },
-            axisLabel: { color: '#ee6666', fontSize: 11 },
-            splitLine: { show: false }
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
+          formatter: function(params) {
+            if (!params.length) return ''
+            var result = params[0].name + '<br/>'
+            for (var i = 0; i < params.length; i++) {
+              result += params[i].marker + ' ' + params[i].seriesName + ': ' + params[i].value + '<br/>'
+            }
+            return result
           }
-        ],
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: []
+        },
+        yAxis: {
+          type: 'value',
+          name: '流量 (m³/h)',
+          position: 'left',
+          axisLine: {
+            show: true,
+            lineStyle: {
+              color: '#91cc75'
+            }
+          },
+          axisLabel: {
+            formatter: '{value}'
+          }
+        },
         series: [
           {
-            name: '压力 (MPa)',
+            name: '流量',
             type: 'line',
+            data: [],
             smooth: true,
-            symbol: 'none',
-            lineStyle: { width: 2, color: '#5470c6' },
-            itemStyle: { color: '#5470c6' },
-            data: []
-          },
-          {
-            name: '流量 (m³/h)',
-            type: 'line',
-            smooth: true,
-            symbol: 'none',
-            yAxisIndex: 1,
-            lineStyle: { width: 2, color: '#91cc75' },
-            itemStyle: { color: '#91cc75' },
-            data: []
-          },
-          {
-            name: '温度 (°C)',
-            type: 'line',
-            smooth: true,
-            symbol: 'none',
-            yAxisIndex: 2,
-            lineStyle: { width: 2, color: '#ee6666' },
-            itemStyle: { color: '#ee6666' },
-            data: []
+            lineStyle: {
+              color: '#91cc75'
+            },
+            itemStyle: {
+              color: '#91cc75'
+            }
           }
         ]
       })
+
+      // 初始化温度图表
+      this.temperatureChart = echarts.init(this.$refs.temperatureChartRef)
+      this.temperatureChart.setOption({
+        title: {
+          text: '温度趋势',
+          left: 'center',
+          top: 4,
+          textStyle: { fontSize: 14 }
+        },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
+          formatter: function(params) {
+            if (!params.length) return ''
+            var result = params[0].name + '<br/>'
+            for (var i = 0; i < params.length; i++) {
+              result += params[i].marker + ' ' + params[i].seriesName + ': ' + params[i].value + '<br/>'
+            }
+            return result
+          }
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: []
+        },
+        yAxis: {
+          type: 'value',
+          name: '温度 (°C)',
+          position: 'left',
+          axisLine: {
+            show: true,
+            lineStyle: {
+              color: '#fac858'
+            }
+          },
+          axisLabel: {
+            formatter: '{value}'
+          }
+        },
+        series: [
+          {
+            name: '温度',
+            type: 'line',
+            data: [],
+            smooth: true,
+            lineStyle: {
+              color: '#fac858'
+            },
+            itemStyle: {
+              color: '#fac858'
+            }
+          }
+        ]
+      })
+      
+      window.addEventListener('resize', function() {
+        if (this.pressureChart) this.pressureChart.resize()
+        if (this.flowChart) this.flowChart.resize()
+        if (this.temperatureChart) this.temperatureChart.resize()
+      }.bind(this))
     },
     updateChart() {
-      const toMs = ts => new Date(ts).getTime()
-      const pressure    = this.historyData.map(item => [toMs(item.timestamp), item.pressure])
-      const flow        = this.historyData.map(item => [toMs(item.timestamp), item.flow])
-      const temperature = this.historyData.map(item => [toMs(item.timestamp), item.temperature])
+      var timestamps = []
+      var pressureData = []
+      var flowData = []
+      var temperatureData = []
 
-      this.chart.setOption({
-        series: [
-          { name: '压力 (MPa)',   data: pressure },
-          { name: '流量 (m³/h)',  data: flow },
-          { name: '温度 (°C)',    data: temperature }
-        ]
-      })
+      for (var i = 0; i < this.historyData.length; i++) {
+        // 直接截取本地时间字符串中的 HH:MM 部分
+        var ts = this.historyData[i].timestamp || ''
+        timestamps.push(ts.length >= 16 ? ts.slice(11, 16) : ts)
+        pressureData.push(this.historyData[i].pressure)
+        flowData.push(this.historyData[i].flow)
+        temperatureData.push(this.historyData[i].temperature)
+      }
+      
+      // 更新压力图表
+      if (this.pressureChart) {
+        this.pressureChart.setOption({
+          xAxis: {
+            data: timestamps
+          },
+          series: [
+            {
+              data: pressureData
+            }
+          ]
+        })
+      }
+
+      // 更新流量图表
+      if (this.flowChart) {
+        this.flowChart.setOption({
+          xAxis: {
+            data: timestamps
+          },
+          series: [
+            {
+              data: flowData
+            }
+          ]
+        })
+      }
+
+      // 更新温度图表
+      if (this.temperatureChart) {
+        this.temperatureChart.setOption({
+          xAxis: {
+            data: timestamps
+          },
+          series: [
+            {
+              data: temperatureData
+            }
+          ]
+        })
+      }
+    },
+    handleTimeRangeChange() {
+      if (this.timeRange === '1h') {
+        this.filterForm.start_time = new Date(Date.now() - 3600000)
+        this.filterForm.end_time = new Date()
+      } else if (this.timeRange === '24h') {
+        this.filterForm.start_time = new Date(Date.now() - 24 * 3600000)
+        this.filterForm.end_time = new Date()
+      } else if (this.timeRange === '72h') {
+        this.filterForm.start_time = new Date(Date.now() - 72 * 3600000)
+        this.filterForm.end_time = new Date()
+      } else if (this.timeRange === 'custom') {
+        // 为自定义时间范围设置默认值
+        if (!this.filterForm.start_time) {
+          this.filterForm.start_time = new Date(Date.now() - 3600000)
+        }
+        if (!this.filterForm.end_time) {
+          this.filterForm.end_time = new Date()
+        }
+      }
+      this.loadHistoryData()
+    },
+    handleSizeChange(val) {
+      this.pagination.pageSize = val
+      this.pagination.currentPage = 1
+    },
+    handleCurrentChange(val) {
+      this.pagination.currentPage = val
     },
     exportData() {
-      // 简单的CSV导出功能
-      if (this.historyData.length === 0) {
-        this.$message.warning('没有数据可导出')
-        return
-      }
-      
-      const headers = ['时间', '压力 (MPa)', '流量 (m³/h)', '温度 (°C)', '状态', '数据源']
-      const rows = this.historyData.map(item => [
-        item.timestamp,
-        item.pressure,
-        item.flow,
-        item.temperature,
-        item.status === 'normal' ? '正常' : '预警',
-        item.source_type
-      ])
-      
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-      ].join('\n')
-      
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.setAttribute('href', url)
-      link.setAttribute('download', `history_${this.filterForm.device_id}_${new Date().toISOString().split('T')[0]}.csv`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
+      var dataStr = JSON.stringify(this.historyData, null, 2)
+      var dataBlob = new Blob([dataStr], { type: 'application/json' })
+      var url = URL.createObjectURL(dataBlob)
+      var link = document.createElement('a')
+      link.href = url
+      link.download = 'device_' + this.filterForm.device_id + '_history_' + new Date().toISOString().split('T')[0] + '.json'
       link.click()
-      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     },
-    handleSizeChange(size) {
-      this.pagination.pageSize = size
+    handleDeviceChange(deviceId) {
+      this.filterForm.device_id = deviceId
+      this.loadHistoryData()
     },
-    handleCurrentChange(current) {
-      this.pagination.currentPage = current
+    clearDeviceFilter() {
+      this.$router.push('/history')
     },
-    handleTimeRangeChange(value) {
-      const now = new Date()
-      switch (value) {
-        case '1h':
-          this.filterForm.start_time = new Date(now.getTime() - 3600000) // 1小时前
-          this.filterForm.end_time = now
-          break
-        case '24h':
-          this.filterForm.start_time = new Date(now.getTime() - 24 * 3600000) // 24小时前
-          this.filterForm.end_time = now
-          break
-        case '72h':
-          this.filterForm.start_time = new Date(now.getTime() - 72 * 3600000) // 72小时前
-          this.filterForm.end_time = now
-          break
-        case 'custom':
-          // 保持当前时间范围不变
-          break
-      }
-      // 自动加载数据
-      if (this.filterForm.device_id) {
-        this.loadHistoryData()
-      }
+    formatLocalISO(date) {
+      if (!date) return ''
+      const d = date instanceof Date ? date : new Date(date)
+      const pad = n => String(n).padStart(2, '0')
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
     },
     formatDateTime(timestamp) {
       if (!timestamp) return ''
+      // 后端返回本地时间字符串，直接截取显示，避免时区转换问题
+      if (typeof timestamp === 'string' && timestamp.length >= 16) {
+        return timestamp.slice(0, 16).replace('T', ' ')
+      }
       const date = new Date(timestamp)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      const seconds = String(date.getSeconds()).padStart(2, '0')
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+      const pad = n => String(n).padStart(2, '0')
+      return `${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
     }
   }
 }
@@ -383,18 +527,71 @@ export default {
   padding: 0;
 }
 
+.page-title {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.device-filter-tag {
+  font-size: 14px;
+  font-weight: normal;
+  color: #409EFF;
+  margin-left: 10px;
+}
+
+.filter-card {
+  margin-bottom: 20px;
+}
+
 .filter-form {
   margin-bottom: 0;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .chart-container {
   width: 100%;
-  height: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.single-chart {
+  width: 100%;
+  height: 300px;
+}
+
+@media screen and (max-width: 1366px) {
+  .page-title {
+    font-size: 16px;
+  }
+  
+  .single-chart {
+    height: 250px;
+  }
+}
+
+@media screen and (max-width: 1280px) {
+  .page-title {
+    font-size: 14px;
+  }
+  
+  .single-chart {
+    height: 230px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .page-title {
+    font-size: 14px;
+  }
+  
+  .single-chart {
+    height: 200px;
+  }
+  
+  :deep(.el-pagination) {
+    font-size: 12px;
+  }
 }
 </style>

@@ -23,12 +23,14 @@ def init_redis_client():
     global redis_client
     if not settings.LOCAL_MODE:
         import redis
-        redis_client = redis.Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            password=settings.REDIS_PASSWORD,
-            decode_responses=True
-        )
+        redis_kwargs = {
+            "host": settings.REDIS_HOST,
+            "port": settings.REDIS_PORT,
+            "decode_responses": True
+        }
+        if settings.REDIS_PASSWORD is not None:
+            redis_kwargs["password"] = settings.REDIS_PASSWORD
+        redis_client = redis.Redis(**redis_kwargs)
 
 def get_redis_client():
     """获取Redis客户端"""

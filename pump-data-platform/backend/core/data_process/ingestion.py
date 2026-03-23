@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from typing import Dict
-from ..db import get_influxdb_client, get_postgres_connection, get_redis_client
+from ..db import get_influxdb_client, get_postgres_connection, get_redis_client, release_postgres_connection
 from ..config import settings
 
 
@@ -131,5 +131,8 @@ class DataIngestion:
             
             conn.commit()
             cursor.close()
+            release_postgres_connection(conn)
         except Exception as e:
             print(f"写入预警记录失败: {e}")
+            if 'conn' in locals():
+                release_postgres_connection(conn)

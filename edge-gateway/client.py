@@ -66,7 +66,8 @@ class EdgeGatewayClient:
             async with session.post(self.upload_endpoint, json=payload) as response:
                 if response.status == 200:
                     result = await response.json()
-                    print(f"✓ 数据上传成功: {result['sensor_count']} 个传感器")
+                    sensor_count = len(sensors_data)
+                    print(f"✓ 数据上传成功: {sensor_count} 个传感器")
                     return True
                 else:
                     print(f"✗ 数据上传失败: HTTP {response.status}")

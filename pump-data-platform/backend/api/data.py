@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, HTTPException
 from datetime import datetime
 from typing import List, Dict, Optional
 from pydantic import BaseModel
-from core.service import DataService
+from core.service import DataService, WarningService
 import json
 
 data_router = APIRouter()
@@ -93,3 +93,66 @@ def receive_batch_data(data_list: List[ReceiveDataRequest]):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量数据处理失败: {str(e)}")
+
+
+@data_router.get("/ai/stats/{device_id}", response_model=Dict)
+def get_ai_stats(device_id: str):
+    """
+    获取设备的AI模型统计信息
+    
+    - **device_id**: 设备ID
+    """
+    try:
+        stats = DataService.get_ai_stats(device_id)
+        return {
+            "success": True,
+            "device_id": device_id,
+            "stats": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取AI统计信息失败: {str(e)}")
+
+
+@data_router.get("/ai/predict/{device_id}", response_model=Dict)
+def predict_warning(device_id: str):
+    """
+    使用AI模型预测设备未来预警
+    
+    - **device_id**: 设备ID
+    """
+    try:
+        # 获取当前数据
+        current_data = DataService.get_realtime_data(device_id)
+        
+        # 使用AI预测
+        will_warn, confidence, warn_type, details = WarningService.predict_warning_with_ai(
+            device_id, current_data
+        )
+        
+        return {
+            "success": True,
+            "device_id": device_id,
+            "prediction": {
+                "will_warn": will_warn,
+                "confidence": confidence,
+                "warning_type": warn_type,
+                "details": details
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI预测失败: {str(e)}")
+
+
+@data_router.get("/smart-thresholds", response_model=Dict)
+def get_smart_thresholds():
+    """
+    获取智能阈值（历史数据的95分位值）
+    """
+    try:
+        thresholds = DataService.get_smart_thresholds()
+        return {
+            "success": True,
+            "thresholds": thresholds
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取智能阈值失败: {str(e)}")

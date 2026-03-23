@@ -21,12 +21,20 @@
           <span>设备管理</span>
         </div>
       </template>
-      <el-table :data="filteredDevices" style="width: 100%">
+      <el-table :data="pagedDevices" style="width: 100%">
         <el-table-column prop="device_id" label="设备ID" width="120" />
         <el-table-column prop="name" label="设备名称" />
         <el-table-column prop="location" label="位置" />
-        <el-table-column prop="负责人" label="负责人" width="100" />
-        <el-table-column prop="联系方式" label="联系方式" width="150" />
+        <el-table-column label="负责人" width="100">
+          <template #default="scope">
+            {{ scope.row.负责人 || '未知' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="联系方式" width="150">
+          <template #default="scope">
+            {{ scope.row.联系方式 || '未知' }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="400">
           <template #default="scope">
             <div class="operation-buttons">
@@ -38,6 +46,19 @@
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="filteredDevices.length"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- 编辑设备对话框 -->
@@ -80,11 +101,7 @@ export default {
   name: 'DeviceList',
   data() {
     return {
-      devices: [
-        { device_id: 'device_1', name: '一号泵阀', location: 'A车间', 负责人: '李经理', 联系方式: '13800138000' },
-        { device_id: 'device_2', name: '二号泵阀', location: 'B车间', 负责人: '赵经理', 联系方式: '13900139009' },
-        { device_id: 'device_3', name: '三号泵阀', location: 'C车间', 负责人: '王经理', 联系方式: '13800138003' }
-      ],
+      devices: [],
       searchKeyword: '',
       dialogVisible: false,
       editForm: {
@@ -93,8 +110,13 @@ export default {
         location: '',
         负责人: '',
         联系方式: ''
-      }
+      },
+      currentPage: 1,
+      pageSize: 10
     }
+  },
+  mounted() {
+    this.loadDevices()
   },
   computed: {
     filteredDevices() {
@@ -105,25 +127,45 @@ export default {
         device.name.includes(this.searchKeyword) || 
         device.device_id.includes(this.searchKeyword)
       )
+    },
+    pagedDevices() {
+      const start = (this.currentPage - 1) * this.pageSize
+      const end = start + this.pageSize
+      return this.filteredDevices.slice(start, end)
     }
   },
   methods: {
     searchDevices() {
       // 这里可以添加实际的搜索逻辑
+      this.currentPage = 1 // 搜索后重置到第一页
     },
     editDevice(device) {
       // 编辑设备逻辑
       this.editForm = { ...device }
       this.dialogVisible = true
     },
-    saveDevice() {
-      // 保存设备逻辑
-      const index = this.devices.findIndex(item => item.device_id === this.editForm.device_id)
-      if (index !== -1) {
-        this.devices[index] = { ...this.editForm }
+    async saveDevice() {
+      try {
+        // 调用后端 API 更新设备信息
+        const response = await axios.put(`/device/${this.editForm.device_id}`, {
+          name: this.editForm.name,
+          location: this.editForm.location,
+          负责人: this.editForm.负责人,
+          联系方式: this.editForm.联系方式
+        })
+        
+        // 更新本地设备列表
+        const index = this.devices.findIndex(item => item.device_id === this.editForm.device_id)
+        if (index !== -1) {
+          this.devices[index] = { ...this.editForm }
+        }
+        
         this.$message.success('设备信息已更新')
+        this.dialogVisible = false
+      } catch (error) {
+        console.error('更新设备信息失败:', error)
+        this.$message.error('更新设备信息失败，请重试')
       }
-      this.dialogVisible = false
     },
     viewRealtimeData(deviceId) {
       // 跳转到实时数据页面，带上设备ID参数
@@ -134,8 +176,31 @@ export default {
       this.$router.push(`/history/${deviceId}`)
     },
     viewWarningRecords(deviceId) {
-      // 跳转到预警记录页面
-      this.$router.push('/warning')
+      // 跳转到预警记录页面，带上设备ID参数
+      this.$router.push(`/warning/${deviceId}`)
+    },
+    handleSizeChange(val) {
+      this.pageSize = val
+      this.currentPage = 1 // 改变每页条数后重置到第一页
+    },
+    handleCurrentChange(val) {
+      this.currentPage = val
+    },
+    async loadDevices() {
+      try {
+        const response = await axios.get('/device/list', {
+          params: {
+            page: 1,
+            page_size: 10
+          }
+        })
+        // 确保 response.data.devices 是一个数组
+        this.devices = Array.isArray(response.data.devices) ? response.data.devices : []
+      } catch (error) {
+        console.error('获取设备列表失败:', error)
+        // 发生错误时，设置默认值，确保页面不会空白
+        this.devices = []
+      }
     }
   }
 }
@@ -160,5 +225,11 @@ export default {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
