@@ -129,6 +129,22 @@ class MqttDataSource(BaseDataSource):
             
             print(f"Processing data for device: {device_id}, pressure: {pressure}, flow: {flow}, temperature: {temperature}")
             
+            # 准备数据包
+            data_packet = {
+                'device_id': device_id,
+                'pressure': pressure,
+                'flow': flow,
+                'temperature': temperature,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # 调用数据处理服务进行预警检测
+            try:
+                from core.service.data_service import DataService
+                DataService.process_received_data(data_packet)
+            except Exception as e:
+                print(f"处理预警检测失败：{e}")
+            
             # 更新实时数据
             self.realtime_data[device_id] = {
                 'device_id': device_id,

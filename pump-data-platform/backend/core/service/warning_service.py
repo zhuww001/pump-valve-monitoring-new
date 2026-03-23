@@ -309,14 +309,21 @@ class WarningService:
     @staticmethod
     def update_warning_status(warning_id: int, status: str) -> bool:
         """更新预警状态"""
-        # 本地运行模式下直接返回成功
+        # 本地运行模式下更新内存中的预警记录
         if settings.LOCAL_MODE:
-            return True
-        
+            for warning in WarningService._warning_cache:
+                if warning.get('id') == warning_id:
+                    warning['status'] = status
+                    warning['updated_at'] = datetime.now().isoformat()
+                    print(f"更新预警状态成功：ID={warning_id}, 状态={status}")
+                    return True
+            print(f"未找到预警记录：ID={warning_id}")
+            return False
+            
         try:
             conn = get_postgres_connection()
             cursor = conn.cursor()
-            
+                
             # 更新状态
             query = """
                 UPDATE warning_record SET 
@@ -324,15 +331,15 @@ class WarningService:
                     updated_at = NOW()
                 WHERE id = %s
             """
-            
+                
             cursor.execute(query, (status, warning_id))
-            
+                
             conn.commit()
             cursor.close()
             release_postgres_connection(conn)
             return True
         except Exception as e:
-            print(f"更新预警状态失败: {e}")
+            print(f"更新预警状态失败：{e}")
             if 'conn' in locals():
                 release_postgres_connection(conn)
             return False

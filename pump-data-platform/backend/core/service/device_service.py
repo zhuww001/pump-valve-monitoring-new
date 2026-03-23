@@ -6,11 +6,13 @@ from ..data_source.manager import DataSourceManager
 
 # 本地模式使用的静态设备列表
 _MOCK_DEVICES: List[Dict] = [
-    {"id": 1, "device_id": "device_1", "name": "泵A", "location": "一号车间", "负责人": "", "联系方式": "",
+    {"id": 1, "device_id": "device_1", "name": "泵 A", "location": "一号车间", "负责人": "", "联系方式": "",
      "pressure_threshold": 2.0, "flow_threshold": 5.0, "temperature_threshold": 80.0, "status": "normal"},
-    {"id": 2, "device_id": "device_2", "name": "泵B", "location": "二号车间", "负责人": "", "联系方式": "",
+    {"id": 2, "device_id": "device_2", "name": "泵 B", "location": "二号车间", "负责人": "", "联系方式": "",
      "pressure_threshold": 2.0, "flow_threshold": 5.0, "temperature_threshold": 80.0, "status": "normal"},
-    {"id": 3, "device_id": "device_3", "name": "泵C", "location": "三号车间", "负责人": "", "联系方式": "",
+    {"id": 3, "device_id": "device_3", "name": "泵 C", "location": "三号车间", "负责人": "", "联系方式": "",
+     "pressure_threshold": 2.0, "flow_threshold": 5.0, "temperature_threshold": 80.0, "status": "normal"},
+    {"id": 4, "device_id": "B0320001", "name": "泵 D", "location": "四号车间", "负责人": "", "联系方式": "",
      "pressure_threshold": 2.0, "flow_threshold": 5.0, "temperature_threshold": 80.0, "status": "normal"},
 ]
 

@@ -12,14 +12,16 @@ class SimulateDataSource(BaseDataSource):
 
     def __init__(self):
         self.devices = [
-            {"id": "device_1", "name": "泵A", "location": "一号车间"},
-            {"id": "device_2", "name": "泵B", "location": "二号车间"},
-            {"id": "device_3", "name": "泵C", "location": "三号车间"},
+            {"id": "device_1", "name": "泵 A", "location": "一号车间"},
+            {"id": "device_2", "name": "泵 B", "location": "二号车间"},
+            {"id": "device_3", "name": "泵 C", "location": "三号车间"},
+            {"id": "B0320001", "name": "泵 D", "location": "四号车间"},
         ]
         self.device_status = {
             "device_1": {"pressure": 1.0, "flow": 10.0, "temperature": 40.0},
             "device_2": {"pressure": 1.2, "flow": 12.0, "temperature": 42.0},
             "device_3": {"pressure": 0.9, "flow":  9.0, "temperature": 38.0},
+            "B0320001": {"pressure": 2.3, "flow": 11.0, "temperature": 45.0},  # 压力超过阈值 2.0
         }
         self.thresholds = {"pressure": 2.0, "flow": 5.0, "temperature": 80.0}
 
