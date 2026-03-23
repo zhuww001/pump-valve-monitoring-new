@@ -36,16 +36,18 @@ CREATE TABLE IF NOT EXISTS data_source (
 );
 
 -- 插入初始数据
--- 插入设备数据
+-- 插入设备数据（包含 B0320001）
 INSERT INTO device (device_id, name, location) VALUES
-('device_1', '泵A', '一号车间'),
-('device_2', '泵B', '二号车间'),
-('device_3', '泵C', '三号车间')
+('device_1', '泵 A', '一号车间'),
+('device_2', '泵 B', '二号车间'),
+('device_3', '泵 C', '三号车间'),
+('B0320001', '泵 D', '四号车间')
 ON CONFLICT (device_id) DO NOTHING;
 
 -- 插入数据源数据
 INSERT INTO data_source (name, type, config, is_enabled) VALUES
-('模拟数据源', 'simulate', '{}'::jsonb, true),
-('API数据源', 'api', '{"base_url": "", "token": "", "endpoint": "/api/pump-data"}'::jsonb, false),
-('设备上报数据源', 'report', '{}'::jsonb, false)
+('模拟数据源', 'simulate', '{}'::jsonb, false),
+('API 数据源', 'api', '{"base_url": "", "token": "", "endpoint": "/api/pump-data"}'::jsonb, false),
+('设备上报数据源', 'report', '{}'::jsonb, false),
+('MQTT 数据源', 'mqtt', '{"broker": "10.20.110.60", "port": 1883, "topic": "/iot/data"}'::jsonb, true)
 ON CONFLICT DO NOTHING;
